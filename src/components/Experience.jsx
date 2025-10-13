@@ -18,7 +18,7 @@ const Experience = () => {
       year: '2022',
       title: 'High School Graduate',
       company: 'Japan–Philippines Institute of Technology',
-      description: 'Graduated in Technical-Vocational Track(ICT), and developed interest in programming through basic web development projects.'
+      description: 'Graduated in Technical-Vocational-Livelihood Track (ICT) with an Information and Communications Technology (ICT) strand, and developed interest in programming through basic web development projects.'
     }
   ])
 

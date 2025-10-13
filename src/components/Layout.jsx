@@ -45,25 +45,27 @@ const Layout = () => {
 	return (
 		<div className="min-h-screen text-black bg-white dark:text-white dark:bg-neutral-900">
 			{/* Theme Toggle - Top Right */}
-			<div className="fixed top-12 right-8 z-50">
-				<button
-					onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-					aria-label="Toggle theme"
-					className="relative inline-flex items-center w-10 h-6 rounded-full transition-colors bg-gray-200 hover:bg-gray-300 dark:bg-neutral-700 dark:hover:bg-neutral-600 shadow-lg"
-				>
-					<span className="absolute left-0.5 text-yellow-500">
-						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+			<div className="fixed top-2 right-8 z-50">
+				<label className="inline-flex items-center cursor-pointer">
+					<input
+						type="checkbox"
+						className="sr-only peer"
+						checked={theme === 'dark'}
+						onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+						aria-label="Toggle theme"
+					/>
+					<div className="relative w-10 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 dark:peer-focus:ring-gray-600 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-gray-800 dark:peer-checked:bg-gray-800">
+						{/* Sun Icon */}
+						<svg className="pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-yellow-300 opacity-0 dark:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
 							<circle cx="12" cy="12" r="4" />
 							<path d="M12 2v2m0 16v2M22 12h-2M4 12H2m15.364-7.364-1.414 1.414M8.05 16.95 6.636 18.364m10.728 0-1.414-1.414M8.05 7.05 6.636 5.636" />
 						</svg>
-					</span>
-					<span className="absolute right-0.5 text-gray-700 dark:text-gray-200">
-						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+						{/* Moon Icon */}
+						<svg className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-600 dark:text-gray-200 opacity-100 dark:opacity-0 transition-opacity" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 							<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
 						</svg>
-					</span>
-					<span className={`inline-block h-4 w-4 bg-white dark:bg-neutral-900 rounded-full transform transition-transform ${theme === 'dark' ? 'translate-x-4' : 'translate-x-0'}`} />
-				</button>
+					</div>
+				</label>
 			</div>
 
 			{/* Floating Chat Button */}
