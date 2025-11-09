@@ -1,23 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import clarenceImage from '../assets/clarence.jpg'
+import { useChatMessages } from '../hooks/useChatMessages'
+import { usePortfolioContent } from '../hooks/usePortfolioContent'
+
+const defaultChatSettings = {
+  enabled: true,
+  buttonText: "Chat with Clarence",
+  placeholder: "Type a message...",
+  autoResponses: [],
+  fallbackResponse: "That's interesting! I'm always eager to learn and discuss new topics."
+}
 
 const Chat = ({ isOpen, onClose }) => {
-  const [chatSettings, setChatSettings] = useState({
-    enabled: true,
-    buttonText: "Chat with Clarence",
-    placeholder: "Type a message...",
-    autoResponses: [],
-    fallbackResponse: "That's interesting! I'm always eager to learn and discuss new topics."
-  })
-
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: "Hello! 👋 I'm Clarence's AI assistant. Ask me anything about his projects, skills, or experiences!",
-      sender: 'bot',
-      timestamp: new Date()
-    }
-  ])
+  const { messages, sendMessage } = useChatMessages()
+  const { content } = usePortfolioContent()
+  const chatSettings = content?.chat || defaultChatSettings
   const [inputMessage, setInputMessage] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef(null)
@@ -26,48 +23,34 @@ const Chat = ({ isOpen, onClose }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  const handleSendMessage = async (e) => {
+    e.preventDefault()
+    if (!inputMessage.trim()) return
+
+    try {
+      // Send user message
+      await sendMessage(inputMessage, 'user')
+      setInputMessage('')
+      setIsTyping(true)
+
+      // Generate bot response
+      const botResponse = findBestResponse(inputMessage)
+      
+      // Send bot response after delay
+      setTimeout(async () => {
+        await sendMessage(botResponse, 'bot')
+        setIsTyping(false)
+      }, 1000 + Math.random() * 1000)
+    } catch (error) {
+      console.error('Error sending message:', error)
+    }
+  }
+
   useEffect(() => {
     scrollToBottom()
   }, [messages])
 
-  useEffect(() => {
-    const savedContent = localStorage.getItem('portfolioContent')
-    if (savedContent) {
-      const parsedContent = JSON.parse(savedContent)
-      if (parsedContent.chat) {
-        setChatSettings(parsedContent.chat)
-      }
-    }
 
-    // Load existing messages from localStorage
-    const existingMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]')
-    const portfolioMessages = existingMessages.filter(msg => msg.conversationId === 'portfolio-chat')
-    
-    if (portfolioMessages.length > 0) {
-      setMessages(portfolioMessages)
-    }
-  }, [])
-
-  // Check for new messages from CMS
-  useEffect(() => {
-    const checkForNewMessages = () => {
-      const allMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]')
-      const portfolioMessages = allMessages.filter(msg => msg.conversationId === 'portfolio-chat')
-      
-      // Check if there are new messages that aren't in our current state
-      const currentMessageIds = messages.map(msg => msg.id)
-      const newMessages = portfolioMessages.filter(msg => !currentMessageIds.includes(msg.id))
-      
-      if (newMessages.length > 0) {
-        setMessages(prev => [...prev, ...newMessages])
-      }
-    }
-
-    // Check for new messages every 2 seconds
-    const interval = setInterval(checkForNewMessages, 2000)
-    
-    return () => clearInterval(interval)
-  }, [messages])
 
   const findBestResponse = (userMessage) => {
     const message = userMessage.toLowerCase()
@@ -108,49 +91,6 @@ const Chat = ({ isOpen, onClose }) => {
     return chatSettings.fallbackResponse || "That's interesting! I'm always eager to learn and discuss new topics. Feel free to ask me about my projects, skills, or experiences in tech!"
   }
 
-  const handleSendMessage = (e) => {
-    e.preventDefault()
-    if (!inputMessage.trim()) return
-
-    const userMessage = {
-      id: Date.now(),
-      text: inputMessage,
-      sender: 'user',
-      timestamp: new Date(),
-      status: 'sent',
-      conversationId: 'portfolio-chat'
-    }
-
-    // Save message to localStorage for CMS to see
-    const existingMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]')
-    const updatedMessages = [...existingMessages, userMessage]
-    localStorage.setItem('chatMessages', JSON.stringify(updatedMessages))
-
-    setMessages(prev => [...prev, userMessage])
-    setInputMessage('')
-    setIsTyping(true)
-
-    // Simulate thinking time and generate intelligent response
-    setTimeout(() => {
-      const botResponse = {
-        id: Date.now() + 1,
-        text: findBestResponse(inputMessage),
-        sender: 'bot',
-        timestamp: new Date(),
-        status: 'sent',
-        conversationId: 'portfolio-chat'
-      }
-      
-      // Save bot response to localStorage
-      const botMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]')
-      const updatedBotMessages = [...botMessages, botResponse]
-      localStorage.setItem('chatMessages', JSON.stringify(updatedBotMessages))
-      
-      setMessages(prev => [...prev, botResponse])
-      setIsTyping(false)
-    }, 1000 + Math.random() * 1000) // Random delay between 1-2 seconds for realism
-  }
-
   if (!isOpen) return null
 
   return (
@@ -185,6 +125,13 @@ const Chat = ({ isOpen, onClose }) => {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {messages.length === 0 && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-200">
+              Hello! 👋 I'm Clarence's AI assistant. Ask me anything about his projects, skills, or experiences!
+            </div>
+          </div>
+        )}
         {messages.map((message) => (
           <div
             key={message.id}
@@ -197,7 +144,7 @@ const Chat = ({ isOpen, onClose }) => {
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
               }`}
             >
-              {message.text}
+              {message.message || message.text}
             </div>
           </div>
         ))}

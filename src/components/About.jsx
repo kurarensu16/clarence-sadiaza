@@ -1,23 +1,18 @@
-import { useState, useEffect } from 'react'
+import { usePortfolioContent } from '../hooks/usePortfolioContent'
 
 const About = () => {
-  const [content, setContent] = useState({
-    paragraphs: [
-      "I'm an Information Technology student with a passion for creating clean, intuitive digital experiences. Currently pursuing my degree while building personal projects and learning modern web development technologies.",
-      "My focus is on full-stack development with modern technologies like React, Node.js, and cloud platforms. I enjoy turning ideas into functional applications and continuously learning new technologies to stay current with industry trends.",
-      "Beyond academics, I'm passionate about contributing to open-source projects and building a strong foundation in software engineering principles. I'm always eager to learn and grow in the tech community."
-    ]
-  })
+  const { content, loading } = usePortfolioContent()
+  const aboutContent = content?.about
 
-  useEffect(() => {
-    const savedContent = localStorage.getItem('portfolioContent')
-    if (savedContent) {
-      const parsedContent = JSON.parse(savedContent)
-      if (parsedContent.about) {
-        setContent(parsedContent.about)
-      }
-    }
-  }, [])
+  if (loading || !aboutContent) {
+    return (
+      <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <div className="animate-pulse">
+          <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
@@ -29,7 +24,7 @@ const About = () => {
       </div>
       
       <div className="space-y-3 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-        {content.paragraphs.map((paragraph, index) => (
+        {aboutContent.paragraphs?.map((paragraph, index) => (
           <p key={index}>{paragraph}</p>
         ))}
       </div>

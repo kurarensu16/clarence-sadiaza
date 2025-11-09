@@ -5,17 +5,19 @@ import Experience from './Experience'
 import Projects from './Projects'
 import Contact from './Contact'
 import Chat from './Chat'
+import { usePortfolioContent } from '../hooks/usePortfolioContent'
 
 const Layout = () => {
 	const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
 	const [isChatOpen, setIsChatOpen] = useState(false)
-	const [chatSettings, setChatSettings] = useState({
+	const { content } = usePortfolioContent()
+	const chatSettings = content?.chat || {
 		enabled: true,
 		buttonText: "Chat with Clarence",
 		placeholder: "Type a message...",
 		autoResponses: [],
 		fallbackResponse: "That's interesting! I'm always eager to learn and discuss new topics."
-	})
+	}
 
 	useEffect(() => {
 		const root = document.documentElement
@@ -26,21 +28,6 @@ const Layout = () => {
 		}
 		localStorage.setItem('theme', theme)
 	}, [theme])
-
-	useEffect(() => {
-		const savedContent = localStorage.getItem('portfolioContent')
-		if (savedContent) {
-			const parsedContent = JSON.parse(savedContent)
-			if (parsedContent.chat) {
-				setChatSettings(parsedContent.chat)
-			}
-		}
-		// Ensure chat is enabled by default
-		setChatSettings(prev => ({
-			...prev,
-			enabled: true
-		}))
-	}, [])
 
 	return (
 		<div className="min-h-screen text-black bg-white dark:text-white dark:bg-neutral-900">

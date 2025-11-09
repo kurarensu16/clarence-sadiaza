@@ -1,36 +1,18 @@
-import { useState, useEffect } from 'react'
+import { usePortfolioContent } from '../hooks/usePortfolioContent'
 
 const Experience = () => {
-  const [experiences, setExperiences] = useState([
-    {
-      year: '2023-present',
-      title: 'Information Technology Student',
-      company: 'Dr. Yanga\'s Colleges',
-      description: 'Currently pursuing Bachelor of Science in Information Technology with focus on software development, database management, and IT systems. Maintaining high academic performance while building personal projects.'
-    },
-    {
-      year: '2022-2023',
-      title: 'Self-Taught Developer',
-      company: 'Online Learning',
-      description: 'Completed multiple online courses in web development including React, Node.js, and modern JavaScript. Built various personal projects to practice and showcase skills.'
-    },
-    {
-      year: '2022',
-      title: 'High School Graduate',
-      company: 'Japan–Philippines Institute of Technology',
-      description: 'Graduated in Technical-Vocational-Livelihood Track (ICT) with an Information and Communications Technology (ICT) strand, and developed interest in programming through basic web development projects.'
-    }
-  ])
+  const { content, loading } = usePortfolioContent()
+  const experiences = content?.experience || []
 
-  useEffect(() => {
-    const savedContent = localStorage.getItem('portfolioContent')
-    if (savedContent) {
-      const parsedContent = JSON.parse(savedContent)
-      if (parsedContent.experience) {
-        setExperiences(parsedContent.experience)
-      }
-    }
-  }, [])
+  if (loading) {
+    return (
+      <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <div className="animate-pulse">
+          <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">

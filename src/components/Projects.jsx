@@ -1,58 +1,21 @@
-import { useState, useEffect } from 'react'
+import { usePortfolioContent } from '../hooks/usePortfolioContent'
 
 const Projects = () => {
-  const [skills, setSkills] = useState({
-    frontend: ['JavaScript', 'TypeScript', 'React', 'Tailwind CSS', 'HTML5', 'CSS3', 'Sass', 'Webpack', 'Vite'],
-    backend: ['Node.js', 'Express', 'Python', 'MySQL', 'MongoDB', 'PostgreSQL', 'AWS', 'Supabase']
-  })
+  const { content, loading } = usePortfolioContent()
+  const skills = content?.skills || { frontend: [], backend: [] }
+  const projects = content?.projects || []
 
-  const [projects, setProjects] = useState([
-    {
-      id: 1,
-      title: "E-Commerce Platform",
-      description: "A fully responsive e-commerce website with product filtering, cart functionality, and secure checkout process.",
-      tags: ["React", "Node.js", "MongoDB", "PayMongo"],
-      year: "2024",
-      url: "https://github.com/kurarensu16/ecommerce-platform"
-    },
-    {
-      id: 2,
-      title: "Task Management App",
-      description: "A productivity application for managing tasks with drag-and-drop functionality and real-time collaboration.",
-      tags: ["React", "Firebase", "Material UI", "Redux"],
-      year: "2023",
-      url: "https://github.com/kurarensu16/task-management-app"
-    },
-    {
-      id: 3,
-      title: "Weather Dashboard",
-      description: "Real-time weather application with 5-day forecast, location search, and interactive maps integration.",
-      tags: ["JavaScript", "REST API", "CSS3", "Leaflet"],
-      year: "2023",
-      url: "https://github.com/kurarensu16/weather-dashboard"
-    },
-    {
-      id: 4,
-      title: "Portfolio Website",
-      description: "A minimalist portfolio website showcasing projects and skills with smooth animations and responsive design.",
-      tags: ["React", "Vite", "Tailwind CSS", "Framer Motion"],
-      year: "2024",
-      url: "https://github.com/kurarensu16/portfolio-website"
-    }
-  ])
-
-  useEffect(() => {
-    const savedContent = localStorage.getItem('portfolioContent')
-    if (savedContent) {
-      const parsedContent = JSON.parse(savedContent)
-      if (parsedContent.skills) {
-        setSkills(parsedContent.skills)
-      }
-      if (parsedContent.projects) {
-        setProjects(parsedContent.projects)
-      }
-    }
-  }, [])
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+          <div className="animate-pulse">
+            <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

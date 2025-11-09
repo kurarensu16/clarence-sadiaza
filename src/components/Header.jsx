@@ -1,7 +1,10 @@
 import { useState } from 'react'
+import { usePortfolioContent } from '../hooks/usePortfolioContent'
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { content } = usePortfolioContent()
+  const name = content?.hero?.name || 'Clarence Sadiaza'
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -18,7 +21,7 @@ const Header = () => {
     <header className="fixed top-0 w-full bg-white z-50 border-b border-gray-200">
       <div className="container mx-auto px-6 py-4">
         <div className="flex justify-between items-center">
-          <a href="#" className="text-xl font-bold">Clarence Sadiaza</a>
+          <a href="#" className="text-xl font-bold">{name}</a>
           
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
