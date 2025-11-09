@@ -1,14 +1,30 @@
 import { supabase } from '../lib/supabase'
 
-const CONVERSATION_ID = 'portfolio-chat'
+// Generate or retrieve unique conversation ID per browser/tab
+const getUniqueConversationId = () => {
+  // Use sessionStorage for unique ID per tab (clears when tab closes)
+  // This ensures each tab has its own conversation
+  const storageKey = 'portfolio_chat_conversation_id'
+  let conversationId = sessionStorage.getItem(storageKey)
+  
+  if (!conversationId) {
+    // Generate a unique ID: timestamp + random string
+    conversationId = `chat-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+    sessionStorage.setItem(storageKey, conversationId)
+  }
+  
+  return conversationId
+}
 
 // Get chat messages for portfolio chat
-export const getChatMessages = async (limit = 50) => {
+export const getChatMessages = async (conversationId = null, limit = 50) => {
   try {
+    const chatId = conversationId || getUniqueConversationId()
+    
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
-      .eq('conversation_id', CONVERSATION_ID)
+      .eq('conversation_id', chatId)
       .order('created_at', { ascending: true })
       .limit(limit)
 
@@ -22,8 +38,10 @@ export const getChatMessages = async (limit = 50) => {
 }
 
 // Send a chat message
-export const sendChatMessage = async (message, sender = 'user') => {
+export const sendChatMessage = async (message, sender = 'user', conversationId = null) => {
   try {
+    const chatId = conversationId || getUniqueConversationId()
+    
     // Try to get user, but don't require authentication (for public chat)
     let user = null
     try {
@@ -37,7 +55,7 @@ export const sendChatMessage = async (message, sender = 'user') => {
     const { data, error } = await supabase
       .from('chat_messages')
       .insert({
-        conversation_id: CONVERSATION_ID,
+        conversation_id: chatId,
         sender: sender,
         message: message,
         status: 'sent',
@@ -59,8 +77,9 @@ export const sendChatMessage = async (message, sender = 'user') => {
 }
 
 // Subscribe to new chat messages
-export const subscribeToChatMessages = (callback) => {
-  const channelName = `chat_messages_${CONVERSATION_ID}_${Date.now()}`
+export const subscribeToChatMessages = (callback, conversationId = null) => {
+  const chatId = conversationId || getUniqueConversationId()
+  const channelName = `chat_messages_${chatId}_${Date.now()}`
   
   const subscription = supabase
     .channel(channelName)
@@ -70,7 +89,7 @@ export const subscribeToChatMessages = (callback) => {
         event: 'INSERT',
         schema: 'public',
         table: 'chat_messages',
-        filter: `conversation_id=eq.${CONVERSATION_ID}`
+        filter: `conversation_id=eq.${chatId}`
       },
       (payload) => {
         console.log('Chat subscription received:', payload)
@@ -81,7 +100,7 @@ export const subscribeToChatMessages = (callback) => {
     )
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        console.log('Chat subscription active')
+        console.log('Chat subscription active for conversation:', chatId)
       } else if (status === 'CHANNEL_ERROR') {
         console.error('Chat subscription error')
       } else if (status === 'TIMED_OUT') {

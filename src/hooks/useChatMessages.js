@@ -1,13 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
 import { getChatMessages, sendChatMessage, subscribeToChatMessages } from '../services/chatService'
 
-export const useChatMessages = (conversationId = 'portfolio-chat') => {
+// Get unique conversation ID from sessionStorage (unique per tab)
+const getConversationId = () => {
+  const storageKey = 'portfolio_chat_conversation_id'
+  let conversationId = sessionStorage.getItem(storageKey)
+  
+  if (!conversationId) {
+    conversationId = `chat-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+    sessionStorage.setItem(storageKey, conversationId)
+  }
+  
+  return conversationId
+}
+
+export const useChatMessages = () => {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const subscriptionRef = useRef(null)
   const messageIdsRef = useRef(new Set())
   const hasLoadedRef = useRef(false)
+  const conversationIdRef = useRef(getConversationId())
 
   useEffect(() => {
     let isMounted = true
@@ -21,7 +35,7 @@ export const useChatMessages = (conversationId = 'portfolio-chat') => {
       
       try {
         setLoading(true)
-        const data = await getChatMessages()
+        const data = await getChatMessages(conversationIdRef.current)
         console.log('Loaded messages from database:', data?.length || 0)
         if (isMounted) {
           // Only set messages if we don't have any, or merge with existing
@@ -65,11 +79,17 @@ export const useChatMessages = (conversationId = 'portfolio-chat') => {
 
     loadMessages()
 
-    // Subscribe to new messages
+    // Subscribe to new messages for this specific conversation
     subscriptionRef.current = subscribeToChatMessages((newMessage) => {
       if (!isMounted) return
       
       console.log('Subscription received message:', newMessage)
+      
+      // Only process messages for this conversation
+      if (newMessage && newMessage.conversation_id !== conversationIdRef.current) {
+        console.log('Message from different conversation, ignoring')
+        return
+      }
       
       // Prevent duplicate messages
       if (newMessage && newMessage.id && !messageIdsRef.current.has(newMessage.id)) {
@@ -87,7 +107,7 @@ export const useChatMessages = (conversationId = 'portfolio-chat') => {
       } else {
         console.log('Skipping duplicate or invalid message:', newMessage)
       }
-    })
+    }, conversationIdRef.current)
 
     return () => {
       isMounted = false
@@ -95,7 +115,7 @@ export const useChatMessages = (conversationId = 'portfolio-chat') => {
         subscriptionRef.current.unsubscribe()
       }
     }
-  }, [conversationId])
+  }, [])
 
   const sendMessage = async (message, sender = 'user') => {
     try {
@@ -124,8 +144,8 @@ export const useChatMessages = (conversationId = 'portfolio-chat') => {
       })
       messageIdsRef.current.add(tempId)
 
-      // Send to server
-      const newMessage = await sendChatMessage(message, sender)
+      // Send to server with unique conversation ID
+      const newMessage = await sendChatMessage(message, sender, conversationIdRef.current)
       console.log('Server response:', newMessage)
       
       if (!newMessage || !newMessage.id) {
