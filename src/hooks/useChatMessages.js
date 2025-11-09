@@ -125,7 +125,7 @@ export const useChatMessages = () => {
       const tempId = `temp-${Date.now()}-${Math.random()}`
       const optimisticMessage = {
         id: tempId,
-        conversation_id: conversationId,
+        conversation_id: conversationIdRef.current,
         sender: sender,
         message: message,
         status: 'sent',
