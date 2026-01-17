@@ -6,7 +6,7 @@ const Experience = () => {
 
   if (loading) {
     return (
-      <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+      <section className="bg-white dark:bg-gray-900 border-4 border-black dark:border-gray-300 p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(209,213,219,1)]">
         <div className="animate-pulse">
           <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
         </div>
@@ -15,7 +15,7 @@ const Experience = () => {
   }
 
   return (
-    <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+    <section className="bg-white dark:bg-gray-900 border-4 border-black dark:border-gray-300 p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(209,213,219,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[6px_6px_0px_0px_rgba(209,213,219,1)] transition-all duration-200 cursor-pointer">
       <div className="flex items-start gap-3 mb-4">
         <svg className="w-5 h-5 text-gray-600 dark:text-gray-300 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2V6" />

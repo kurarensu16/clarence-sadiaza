@@ -123,18 +123,27 @@ export const getPortfolioContent = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
-      // For public portfolio view, try to get content without user
-      // This requires a public read policy or a service role key
+      // For public portfolio view, get the first available content
+      // This requires a public read policy (see fixPortfolioContentRLS.sql)
       const { data, error } = await supabase
         .from('portfolio_content')
         .select('content')
+        .order('updated_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
       
-      if (error || !data) {
+      if (error) {
+        console.error('Error fetching public portfolio content:', error)
+        // Return null instead of throwing, so public view doesn't crash
         return null
       }
-      return data?.content || null
+      
+      if (!data || !data.content) {
+        console.warn('No portfolio content found in database')
+        return null
+      }
+      
+      return data.content
     }
 
     const { data, error } = await supabase

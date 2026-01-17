@@ -2,12 +2,14 @@ import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import Login from './components/Login'
 import CMS from './components/CMS'
+import AllProjects from './components/AllProjects'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Layout />} />
+      <Route path="/projects" element={<AllProjects />} />
       <Route path="/login" element={<Login />} />
       <Route 
         path="/cms" 

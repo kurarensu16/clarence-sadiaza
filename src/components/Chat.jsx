@@ -94,11 +94,11 @@ const Chat = ({ isOpen, onClose }) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed bottom-24 right-6 z-50 w-80 h-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col">
+    <div className="fixed bottom-24 right-6 z-50 w-80 h-96 bg-white dark:bg-gray-900 border-4 border-black dark:border-gray-300 flex flex-col shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(209,213,219,1)]">
       {/* Chat Header */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between p-3 border-b-4 border-black dark:border-gray-300 bg-yellow-400 dark:bg-yellow-400">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full overflow-hidden">
+          <div className="w-8 h-8 overflow-hidden border-2 border-black dark:border-gray-300">
             <img 
               src={clarenceImage} 
               alt="Clarence Sadiaza" 
@@ -106,16 +106,16 @@ const Chat = ({ isOpen, onClose }) => {
             />
           </div>
           <div>
-            <h3 className="font-semibold text-sm text-gray-800 dark:text-gray-200">{chatSettings.buttonText}</h3>
+            <h3 className="font-bold text-sm text-black">{chatSettings.buttonText}</h3>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Online</p>
+              <div className="w-2 h-2 bg-green-500 border border-black"></div>
+              <p className="text-xs text-black font-bold">Online</p>
             </div>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"
+          className="text-black hover:bg-black hover:text-white dark:hover:bg-gray-300 dark:hover:text-black p-1 border-2 border-black dark:border-gray-300 font-bold transition-all duration-200"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -127,7 +127,7 @@ const Chat = ({ isOpen, onClose }) => {
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-200">
+            <div className="bg-blue-400 px-3 py-2 border-2 border-black dark:border-gray-300 text-sm text-black font-bold">
               Hello! 👋 I'm Clarence's AI assistant. Ask me anything about his projects, skills, or experiences!
             </div>
           </div>
@@ -138,10 +138,10 @@ const Chat = ({ isOpen, onClose }) => {
             className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+              className={`max-w-xs px-3 py-2 border-2 border-black dark:border-gray-300 text-sm font-bold ${
                 message.sender === 'user'
-                  ? 'bg-black dark:bg-white text-white dark:text-black'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                  ? 'bg-black dark:bg-gray-300 text-white dark:text-black'
+                  : 'bg-yellow-400 dark:bg-yellow-400 text-black'
               }`}
             >
               {message.message || message.text}
@@ -151,11 +151,11 @@ const Chat = ({ isOpen, onClose }) => {
         
         {isTyping && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg">
+            <div className="bg-yellow-400 px-3 py-2 border-2 border-black dark:border-gray-300">
               <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-black border border-black animate-bounce"></div>
+                <div className="w-2 h-2 bg-black border border-black animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-black border border-black animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -164,7 +164,7 @@ const Chat = ({ isOpen, onClose }) => {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+      <div className="p-3 border-t-4 border-black dark:border-gray-300 bg-white dark:bg-gray-900">
         <form onSubmit={handleSendMessage} className="space-y-2">
           <div className="flex gap-2">
             <input
@@ -173,21 +173,21 @@ const Chat = ({ isOpen, onClose }) => {
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder={chatSettings.placeholder}
               maxLength={1000}
-              className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white text-sm placeholder-gray-500 dark:placeholder-gray-400 dark:text-white"
+              className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border-4 border-black dark:border-gray-300 focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-100 text-sm placeholder-gray-500 dark:placeholder-gray-400 text-black dark:text-gray-100 font-bold"
             />
             <button
               type="submit"
               disabled={!inputMessage.trim()}
-              className="w-10 h-10 bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="w-10 h-10 bg-black dark:bg-gray-300 text-white dark:text-black border-4 border-black dark:border-gray-300 hover:bg-white hover:text-black dark:hover:bg-gray-400 dark:hover:text-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-bold transition-all duration-200 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:shadow-[2px_2px_0px_0px_rgba(209,213,219,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[1px_1px_0px_0px_rgba(209,213,219,1)]"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>
           </div>
-          <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex justify-between items-center text-xs text-black dark:text-white font-bold">
             <span>Ask me about programming, web dev, or tech!</span>
-            <span>{inputMessage.length}/1000</span>
+            <span className="bg-yellow-400 px-2 py-1 border-2 border-black dark:border-gray-300">{inputMessage.length}/1000</span>
           </div>
         </form>
       </div>
