@@ -3,7 +3,7 @@ import { usePortfolioContent } from '../hooks/usePortfolioContent'
 
 const AllProjects = () => {
   const { content, loading } = usePortfolioContent()
-  const projects = content?.projects || []
+  const projects = [...(content?.projects || [])].sort((a, b) => (b.year || '').localeCompare(a.year || ''))
 
   if (loading) {
     return (
@@ -54,7 +54,7 @@ const AllProjects = () => {
               }
             }
             const domain = getDomain(project.url)
-            
+
             return (
               <a
                 key={project.id}
@@ -67,10 +67,20 @@ const AllProjects = () => {
                   <h2 className="text-xl font-bold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{project.title}</h2>
                   <span className="text-sm text-gray-500 dark:text-gray-400">{project.year}</span>
                 </div>
-                
+
                 <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
                   {project.description}
                 </p>
+
+                {project.image && (
+                  <div className="mb-4 border-2 border-black dark:border-gray-300 overflow-hidden">
+                    <img
+                      src={project.image}
+                      alt={project.title}
+                      className="w-full h-48 object-cover hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                )}
 
                 <div className="mb-4">
                   <h3 className="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Tech Stack</h3>

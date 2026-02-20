@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { usePortfolioContent } from '../hooks/usePortfolioContent'
+import { supabase } from '../lib/supabase'
 
 const CMS = () => {
   const { content, loading, error, updateContent } = usePortfolioContent()
@@ -11,7 +12,53 @@ const CMS = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [uploadingImageIndex, setUploadingImageIndex] = useState(null)
   const navigate = useNavigate()
+
+  const handleImageUpload = async (file, projectIndex) => {
+    if (!file) return
+    setUploadingImageIndex(projectIndex)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('project-images')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('project-images')
+        .getPublicUrl(filePath)
+
+      updateArrayContent('projects', projectIndex, 'image', publicUrl)
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert('Failed to upload image. Make sure the "project-images" storage bucket exists in your Supabase project.')
+    } finally {
+      setUploadingImageIndex(null)
+    }
+  }
+
+  const handleRemoveImage = async (projectIndex) => {
+    const project = currentContent.projects[projectIndex]
+    if (project.image) {
+      try {
+        const url = new URL(project.image)
+        const pathParts = url.pathname.split('/project-images/')
+        if (pathParts.length > 1) {
+          await supabase.storage
+            .from('project-images')
+            .remove([pathParts[1]])
+        }
+      } catch (e) {
+        console.warn('Could not delete old image from storage:', e)
+      }
+    }
+    updateArrayContent('projects', projectIndex, 'image', '')
+  }
 
   // Use content from database (will be null initially, then auto-created with defaults)
   const currentContent = content
@@ -60,7 +107,7 @@ const CMS = () => {
   const updateArrayContent = (section, index, field, value) => {
     const updatedContent = {
       ...currentContent,
-      [section]: currentContent[section].map((item, i) => 
+      [section]: currentContent[section].map((item, i) =>
         i === index ? { ...item, [field]: value } : item
       )
     }
@@ -84,36 +131,36 @@ const CMS = () => {
   }
 
   const tabs = [
-    { 
-      id: 'hero', 
-      name: 'Hero Section', 
+    {
+      id: 'hero',
+      name: 'Hero Section',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       )
     },
-    { 
-      id: 'about', 
-      name: 'About', 
+    {
+      id: 'about',
+      name: 'About',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       )
     },
-    { 
-      id: 'experience', 
-      name: 'Experience', 
+    {
+      id: 'experience',
+      name: 'Experience',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2V6" />
         </svg>
       )
     },
-    { 
-      id: 'skills', 
-      name: 'Skills', 
+    {
+      id: 'skills',
+      name: 'Skills',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -121,27 +168,27 @@ const CMS = () => {
         </svg>
       )
     },
-    { 
-      id: 'projects', 
-      name: 'Projects', 
+    {
+      id: 'projects',
+      name: 'Projects',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
       )
     },
-    { 
-      id: 'contact', 
-      name: 'Contact', 
+    {
+      id: 'contact',
+      name: 'Contact',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       )
     },
-    { 
-      id: 'chat', 
-      name: 'Chat Settings', 
+    {
+      id: 'chat',
+      name: 'Chat Settings',
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -465,7 +512,8 @@ const CMS = () => {
                   description: '',
                   tags: [],
                   year: '',
-                  url: ''
+                  url: '',
+                  image: ''
                 })}
                 className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-md hover:bg-gray-800 dark:hover:bg-gray-200 flex items-center gap-2"
               >
@@ -537,6 +585,69 @@ const CMS = () => {
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white dark:bg-gray-800 dark:text-white"
                         placeholder="https://github.com/username/project-name"
                       />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-2">Project Image</label>
+                      {project.image ? (
+                        <div className="relative group">
+                          <img
+                            src={project.image}
+                            alt={project.title || 'Project image'}
+                            className="w-full h-48 object-cover rounded-md border border-gray-300 dark:border-gray-600"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center gap-3">
+                            <label className="px-3 py-1.5 bg-white text-black text-sm font-medium rounded-md cursor-pointer hover:bg-gray-200 transition-colors">
+                              Replace
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files[0]) handleImageUpload(e.target.files[0], index)
+                                }}
+                              />
+                            </label>
+                            <button
+                              onClick={() => handleRemoveImage(index)}
+                              className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-md cursor-pointer transition-colors ${uploadingImageIndex === index
+                            ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 bg-gray-50 dark:bg-gray-800'
+                          }`}>
+                          {uploadingImageIndex === index ? (
+                            <div className="flex flex-col items-center">
+                              <svg className="animate-spin w-8 h-8 text-blue-500 mb-2" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span className="text-sm text-blue-500 font-medium">Uploading...</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">Click to upload image</span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">PNG, JPG, GIF, WebP</span>
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingImageIndex === index}
+                            onChange={(e) => {
+                              if (e.target.files[0]) handleImageUpload(e.target.files[0], index)
+                            }}
+                          />
+                        </label>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -644,7 +755,7 @@ const CMS = () => {
                     </svg>
                     Basic Settings
                   </h4>
-                  
+
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">Button Text</label>
@@ -656,7 +767,7 @@ const CMS = () => {
                         placeholder="Chat with Clarence"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium mb-2">Input Placeholder</label>
                       <input
@@ -667,7 +778,7 @@ const CMS = () => {
                         placeholder="Type a message..."
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium mb-2">Fallback Response</label>
                       <textarea
@@ -715,7 +826,7 @@ const CMS = () => {
                       Add Response
                     </button>
                   </div>
-                  
+
                   {autoResponses.length === 0 ? (
                     <div className="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
                       <svg className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -765,7 +876,7 @@ const CMS = () => {
                               Remove
                             </button>
                           </div>
-                          
+
                           <div className="space-y-3">
                             <div>
                               <label className="flex items-center gap-1 text-sm font-medium mb-1.5">
@@ -793,7 +904,7 @@ const CMS = () => {
                                 Separate multiple triggers with commas
                               </p>
                             </div>
-                            
+
                             <div>
                               <label className="flex items-center gap-1 text-sm font-medium mb-1.5">
                                 <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -817,7 +928,7 @@ const CMS = () => {
                                 placeholder="Enter the bot's response message..."
                               />
                             </div>
-                            
+
                             {/* Preview */}
                             {(response.trigger && response.trigger.length > 0 && response.trigger[0]) || response.response ? (
                               <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
@@ -922,21 +1033,19 @@ const CMS = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-3 text-left rounded-lg transition-colors ${
-                  sidebarCollapsed ? 'justify-center' : ''
-                } ${
-                  activeTab === tab.id
+                className={`w-full flex items-center gap-3 px-3 py-3 text-left rounded-lg transition-colors ${sidebarCollapsed ? 'justify-center' : ''
+                  } ${activeTab === tab.id
                     ? 'bg-black dark:bg-white text-white dark:text-black'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
+                  }`}
                 title={sidebarCollapsed ? tab.name : ''}
               >
                 <span className="flex-shrink-0">{tab.icon}</span>
-                  {!sidebarCollapsed && (
-                    <span className="font-medium truncate">
-                      {tab.name}
-                    </span>
-                  )}
+                {!sidebarCollapsed && (
+                  <span className="font-medium truncate">
+                    {tab.name}
+                  </span>
+                )}
               </button>
             ))}
           </nav>

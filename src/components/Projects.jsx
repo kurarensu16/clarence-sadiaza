@@ -4,7 +4,7 @@ import { usePortfolioContent } from '../hooks/usePortfolioContent'
 const Projects = () => {
   const { content, loading } = usePortfolioContent()
   const skills = content?.skills || { frontend: [], backend: [] }
-  const allProjects = content?.projects || []
+  const allProjects = [...(content?.projects || [])].sort((a, b) => (b.year || '').localeCompare(a.year || ''))
   const displayedProjects = allProjects.slice(0, 2) // Show only first 2 projects
 
   if (loading) {
@@ -30,7 +30,7 @@ const Projects = () => {
           </svg>
           <h2 className="text-xl font-bold">Skills/Technologies</h2>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h3 className="text-sm font-semibold mb-3">Frontend</h3>
@@ -45,7 +45,7 @@ const Projects = () => {
               ))}
             </div>
           </div>
-          
+
           <div>
             <h3 className="text-sm font-semibold mb-3">Backend</h3>
             <div className="flex flex-wrap gap-2">
@@ -88,7 +88,7 @@ const Projects = () => {
             </Link>
           )}
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {displayedProjects.map((project) => {
             // Extract domain from URL
@@ -101,7 +101,7 @@ const Projects = () => {
               }
             }
             const domain = getDomain(project.url)
-            
+
             return (
               <a
                 key={project.id}
@@ -116,6 +116,15 @@ const Projects = () => {
                 <p className="text-gray-600 dark:text-gray-300 mb-4 text-sm leading-relaxed">
                   {project.description.length > 80 ? `${project.description.substring(0, 80)}...` : project.description}
                 </p>
+                {project.image && (
+                  <div className="mb-4 border-2 border-black dark:border-gray-300 overflow-hidden">
+                    <img
+                      src={project.image}
+                      alt={project.title}
+                      className="w-full h-40 object-cover hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                )}
                 <span className="inline-block px-3 py-1.5 bg-blue-400 text-black text-xs font-bold border-2 border-black dark:border-gray-300">
                   {domain}
                 </span>
