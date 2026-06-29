@@ -231,3 +231,20 @@ export const updatePortfolioContent = async (content) => {
       return null
     }
   }
+
+  // Send a contact message to the database
+  export const sendContactMessage = async ({ name, email, message }) => {
+    try {
+      const { data, error } = await supabase
+        .from('contact_messages')
+        .insert([{ name, email, message }])
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Error sending contact message:', error)
+      throw error
+    }
+  }

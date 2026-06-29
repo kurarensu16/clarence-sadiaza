@@ -18,6 +18,9 @@ const CMS = () => {
   const [uploadingImageIndex, setUploadingImageIndex] = useState(null)
   const [hasApiKey, setHasApiKey] = useState(false)
   const [openRouterKeyInput, setOpenRouterKeyInput] = useState('')
+  const [contactMessages, setContactMessages] = useState([])
+  const [messagesLoading, setMessagesLoading] = useState(true)
+  const [selectedMessageId, setSelectedMessageId] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -58,6 +61,59 @@ const CMS = () => {
       fetchPageViews()
     }
   }, [user, activeTab])
+
+  useEffect(() => {
+    let subscription = null
+
+    const fetchContactMessages = async () => {
+      try {
+        setMessagesLoading(true)
+        const { data, error } = await supabase
+          .from('contact_messages')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (error) throw error
+        setContactMessages(data || [])
+      } catch (err) {
+        console.warn('Failed to load contact messages:', err)
+      } finally {
+        setMessagesLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchContactMessages()
+
+      // Subscribe to real-time changes
+      subscription = supabase
+        .channel('contact_messages_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'contact_messages'
+          },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              setContactMessages(prev => [payload.new, ...prev])
+            } else if (payload.eventType === 'UPDATE') {
+              setContactMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new : msg))
+            } else if (payload.eventType === 'DELETE') {
+              setContactMessages(prev => prev.filter(msg => msg.id !== payload.old.id))
+            }
+          }
+        )
+        .subscribe()
+    }
+
+    return () => {
+      if (subscription) {
+        supabase.channel('contact_messages_changes').unsubscribe()
+      }
+    }
+  }, [user])
 
   const handleImageUpload = async (file, projectIndex) => {
     if (!file) return
@@ -197,6 +253,53 @@ const CMS = () => {
     }))
   }
 
+  const markMessageAsRead = async (msgId) => {
+    try {
+      const { error } = await supabase
+        .from('contact_messages')
+        .update({ status: 'read' })
+        .eq('id', msgId)
+      
+      if (error) throw error
+      
+      setContactMessages(prev =>
+        prev.map(msg => msg.id === msgId ? { ...msg, status: 'read' } : msg)
+      )
+    } catch (err) {
+      console.error('Error marking message as read:', err)
+    }
+  }
+
+  const deleteContactMessage = async (msgId) => {
+    if (!window.confirm('Are you sure you want to delete this message?')) return
+    try {
+      const { error } = await supabase
+        .from('contact_messages')
+        .delete()
+        .eq('id', msgId)
+      
+      if (error) throw error
+      
+      setContactMessages(prev => prev.filter(msg => msg.id !== msgId))
+      if (selectedMessageId === msgId) {
+        setSelectedMessageId(null)
+      }
+    } catch (err) {
+      console.error('Error deleting message:', err)
+    }
+  }
+
+  const formatMessageDate = (dateStr) => {
+    const date = new Date(dateStr)
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
   const tabs = [
     {
       id: 'dashboard',
@@ -204,6 +307,15 @@ const CMS = () => {
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      )
+    },
+    {
+      id: 'messages',
+      name: 'Inbox Messages',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0V9a2 2 0 00-2-2M4 13V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10M4 17h16m-4-4H8m-2 4h12" />
         </svg>
       )
     },
@@ -1188,6 +1300,198 @@ const CMS = () => {
           </div>
         )
 
+      case 'messages': {
+        const unreadCount = contactMessages.filter(m => m.status === 'unread').length
+        const selectedMsg = contactMessages.find(m => m.id === selectedMessageId)
+
+        return (
+          <div className="h-full flex flex-col space-y-4">
+            {/* Inbox Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800 gap-4 flex-shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 uppercase tracking-tight">Inbox Messages</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">
+                  You have {unreadCount} unread message{unreadCount !== 1 ? 's' : ''} out of {contactMessages.length} total.
+                </p>
+              </div>
+            </div>
+
+            {messagesLoading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 dark:border-slate-100 mx-auto mb-3"></div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Loading inbox...</p>
+                </div>
+              </div>
+            ) : contactMessages.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-dashed border-slate-200 dark:border-slate-800">
+                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 flex items-center justify-center border border-slate-200 dark:border-slate-800 rounded-none mb-4 text-slate-400 dark:text-slate-600">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 19v-8.93a2 2 0 01.89-1.664l8-5.333a2 2 0 012.22 0l8 5.333A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
+                  </svg>
+                </div>
+                <h4 className="text-base font-bold uppercase tracking-tight text-slate-900 dark:text-slate-100">Your inbox is clean</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs leading-normal">
+                  No contact messages have been received yet. When visitors fill out the form on your portfolio website, they will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
+                {/* Message List Panel */}
+                <div className="lg:col-span-5 flex flex-col border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/30 rounded-none overflow-hidden min-h-0">
+                  <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/65 flex-shrink-0">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">All Messages ({contactMessages.length})</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto divide-y divide-slate-150 dark:divide-slate-850">
+                    {contactMessages.map((msg) => {
+                      const isUnread = msg.status === 'unread'
+                      const isSelected = msg.id === selectedMessageId
+                      return (
+                        <div
+                          key={msg.id}
+                          onClick={() => {
+                            setSelectedMessageId(msg.id)
+                            if (isUnread) {
+                              markMessageAsRead(msg.id)
+                            }
+                          }}
+                          className={`p-4 cursor-pointer text-left transition-all ${
+                            isSelected
+                              ? 'bg-slate-100 dark:bg-slate-900/80 border-l-4 border-slate-900 dark:border-slate-100 pl-3'
+                              : 'hover:bg-slate-50/80 dark:hover:bg-slate-900/20 border-l-4 border-transparent'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-1 gap-2">
+                            <h5 className={`text-sm truncate ${isUnread ? 'font-bold text-slate-950 dark:text-white' : 'font-semibold text-slate-700 dark:text-slate-350'}`}>
+                              {msg.name}
+                            </h5>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                              {new Date(msg.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mb-1">
+                            {msg.email}
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                            {msg.message}
+                          </p>
+                          <div className="mt-2.5 flex items-center justify-between">
+                            {isUnread ? (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-red-200 bg-red-50 text-red-700 text-[10px] font-bold uppercase rounded-none dark:border-red-950/50 dark:bg-red-950/20 dark:text-red-400">
+                                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+                                New
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-slate-200 bg-slate-50 text-slate-500 text-[10px] font-semibold uppercase rounded-none dark:border-slate-805 dark:bg-slate-900 dark:text-slate-400">
+                                Read
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Message Detail Panel */}
+                <div className="lg:col-span-7 flex flex-col border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/30 rounded-none overflow-hidden min-h-0">
+                  {selectedMsg ? (
+                    <div className="flex-1 flex flex-col min-h-0">
+                      {/* Detail Header */}
+                      <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex-shrink-0 bg-slate-50/30 dark:bg-slate-900/30">
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-1">Sender Info</span>
+                            <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">{selectedMsg.name}</h4>
+                            <a href={`mailto:${selectedMsg.email}`} className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors underline decoration-dotted mt-0.5 block">
+                              {selectedMsg.email}
+                            </a>
+                          </div>
+                          <div className="text-left md:text-right whitespace-nowrap">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-1">Received At</span>
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-355 flex items-center justify-end">
+                              {formatMessageDate(selectedMsg.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detail Message Body */}
+                      <div className="flex-1 p-6 overflow-y-auto bg-white dark:bg-slate-950/20">
+                        <div className="prose dark:prose-invert max-w-none">
+                          <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                            {selectedMsg.message}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Detail Actions Footer */}
+                      <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0 bg-slate-50/50 dark:bg-slate-900/40 flex justify-between items-center gap-3">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const newStatus = selectedMsg.status === 'unread' ? 'read' : 'unread'
+                              const { error } = await supabase
+                                .from('contact_messages')
+                                .update({ status: newStatus })
+                                .eq('id', selectedMsg.id)
+                              if (error) throw error
+                              setContactMessages(prev => prev.map(msg => msg.id === selectedMsg.id ? { ...msg, status: newStatus } : msg))
+                            } catch (e) {
+                              console.error('Error toggling read status:', e)
+                            }
+                          }}
+                          className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-850 font-semibold text-xs rounded-none uppercase tracking-wider transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 19v-8.93a2 2 0 01.89-1.664l8-5.333a2 2 0 012.22 0l8 5.333A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5" />
+                          </svg>
+                          Mark as {selectedMsg.status === 'unread' ? 'Read' : 'Unread'}
+                        </button>
+                        
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => deleteContactMessage(selectedMsg.id)}
+                            className="px-3.5 py-2 border border-transparent text-red-650 hover:bg-red-50 dark:hover:bg-red-950/20 font-semibold text-xs rounded-none uppercase tracking-wider transition-colors flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                          </button>
+
+                          <a
+                            href={`mailto:${selectedMsg.email}?subject=Re: Message from ${encodeURIComponent(selectedMsg.name)}&body=${encodeURIComponent(
+                              `Hi ${selectedMsg.name},\n\nThank you for reaching out through my portfolio website. I received your message:\n\n"${selectedMsg.message}"\n\n`
+                            )}`}
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 font-semibold text-xs rounded-none uppercase tracking-wider transition-colors flex items-center gap-2 shadow-sm"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                            </svg>
+                            Reply
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400 dark:text-slate-600 bg-slate-50/10 dark:bg-slate-950/5">
+                      <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                      </svg>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Select a message</span>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-xs leading-normal">
+                        Click on a message from the list on the left to read its full content, reply, or delete it.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      }
+
       default:
         return <div>Select a section to edit</div>
     }
@@ -1276,10 +1580,20 @@ const CMS = () => {
                   }`}
                 title={sidebarCollapsed ? tab.name : ''}
               >
-                <span className="flex-shrink-0">{tab.icon}</span>
+                <span className="flex-shrink-0 relative">
+                  {tab.icon}
+                  {tab.id === 'messages' && contactMessages.filter(m => m.status === 'unread').length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border border-white dark:border-slate-900 rounded-full animate-pulse"></span>
+                  )}
+                </span>
                 {!sidebarCollapsed && (
-                  <span className="font-semibold truncate text-sm">
-                    {tab.name}
+                  <span className="font-semibold truncate text-sm flex items-center justify-between w-full">
+                    <span>{tab.name}</span>
+                    {tab.id === 'messages' && contactMessages.filter(m => m.status === 'unread').length > 0 && (
+                      <span className="ml-2 px-1.5 py-0.5 text-[10px] font-extrabold bg-red-500 text-white rounded-full leading-none flex items-center justify-center min-w-[16px] h-4 shadow-sm animate-scale-up">
+                        {contactMessages.filter(m => m.status === 'unread').length}
+                      </span>
+                    )}
                   </span>
                 )}
               </button>

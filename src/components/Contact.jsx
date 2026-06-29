@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { usePortfolioContent } from '../hooks/usePortfolioContent'
+import { sendContactMessage } from '../services/portfolioService'
 
 const Contact = () => {
   const { content, loading } = usePortfolioContent()
@@ -8,6 +9,7 @@ const Contact = () => {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' })
   const [isSending, setIsSending] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const handleInputChange = (e) => {
     setFormData({
@@ -16,16 +18,21 @@ const Contact = () => {
     })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSending(true)
+    setErrorMessage('')
     
-    // Simulate submission
-    setTimeout(() => {
+    try {
+      await sendContactMessage(formData)
       setIsSending(false)
       setShowModal(true)
       setFormData({ name: '', email: '', message: '' })
-    }, 1000)
+    } catch (error) {
+      console.error('Failed to send message:', error)
+      setErrorMessage('Failed to send your message. Please check your connection or try again later.')
+      setIsSending(false)
+    }
   }
 
   if (loading || !contactContent) {
@@ -155,6 +162,12 @@ const Contact = () => {
                 className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 rounded-none font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-500/10 focus:border-slate-900 dark:focus:border-slate-100 resize-none"
               />
             </div>
+
+            {errorMessage && (
+              <div className="p-3 border border-red-200/50 bg-red-50/50 dark:bg-red-950/30 text-red-650 dark:text-red-400 text-xs font-semibold text-center rounded-none">
+                {errorMessage}
+              </div>
+            )}
 
             <button
               type="submit"
