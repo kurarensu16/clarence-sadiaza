@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import clarenceImage from '../assets/clarence.jpg'
 import { useChatMessages } from '../hooks/useChatMessages'
 import { usePortfolioContent } from '../hooks/usePortfolioContent'
+import { supabase } from '../lib/supabase'
 
 const defaultChatSettings = {
   enabled: true,
@@ -23,6 +24,80 @@ const Chat = ({ isOpen, onClose }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  const generateAIResponse = async (userMessage) => {
+    try {
+      const isDev = import.meta.env.DEV
+      const devApiKey = import.meta.env.VITE_OPENROUTER_API_KEY
+
+      if (isDev && devApiKey) {
+        // Direct query in local development to avoid proxy configurations in dev mode
+        const name = content?.hero?.name || 'Clarence Timothy Sadiaza'
+        const title = content?.hero?.title || 'Software Engineer'
+        const about = (content?.about?.paragraphs || []).join(' ')
+        const skills = JSON.stringify(content?.skills || {})
+        const experience = JSON.stringify(content?.experience || [])
+        const projects = JSON.stringify(content?.projects || [])
+        const certifications = JSON.stringify(content?.certifications || [])
+        const email = content?.hero?.email || 'sadiazaclarence@gmail.com'
+
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${devApiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": window.location.origin,
+            "X-Title": "Clarence Sadiaza Portfolio (Local Dev)"
+          },
+          body: JSON.stringify({
+            model: "poolside/laguna-m.1:free",
+            messages: [
+              {
+                role: "system",
+                content: `You are the AI Assistant chatbot on Clarence Timothy Sadiaza's portfolio website. 
+Answer questions briefly and professionally on behalf of Clarence. Keep responses under 3 sentences. If you don't know something or if it's not in the resume, say you will check and let him know, or tell them to email him at ${email}.
+Resume Details:
+- Name: ${name}
+- Title: ${title}
+- About: ${about}
+- Technologies / Skills: ${skills}
+- Experience: ${experience}
+- Projects: ${projects}
+- Certifications: ${certifications}
+- Contact Email: ${email}`
+              },
+              { role: "user", content: userMessage }
+            ]
+          })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          return data.choices?.[0]?.message?.content || chatSettings.fallbackResponse
+        }
+      }
+
+      // Default: Call the secure serverless API proxy (Vercel)
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ user_message: userMessage })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.response && data.response.trim()) {
+          return data.response
+        }
+      }
+    } catch (error) {
+      console.warn('AI chat completion failed:', error)
+    }
+    
+    return chatSettings.fallbackResponse || "I'm sorry, I'm currently having trouble connecting to my AI backend. Please try again in a few moments, or feel free to email Clarence directly!"
+  }
+
   const handleSendMessage = async (e) => {
     e.preventDefault()
     if (!inputMessage.trim()) return
@@ -33,16 +108,15 @@ const Chat = ({ isOpen, onClose }) => {
       setInputMessage('')
       setIsTyping(true)
 
-      // Generate bot response
-      const botResponse = findBestResponse(inputMessage)
+      // Generate bot response via OpenRouter
+      const botResponse = await generateAIResponse(inputMessage)
       
-      // Send bot response after delay
-      setTimeout(async () => {
-        await sendMessage(botResponse, 'bot')
-        setIsTyping(false)
-      }, 1000 + Math.random() * 1000)
+      // Send bot response
+      await sendMessage(botResponse, 'bot')
+      setIsTyping(false)
     } catch (error) {
       console.error('Error sending message:', error)
+      setIsTyping(false)
     }
   }
 
@@ -50,55 +124,14 @@ const Chat = ({ isOpen, onClose }) => {
     scrollToBottom()
   }, [messages])
 
-
-
-  const findBestResponse = (userMessage) => {
-    const message = userMessage.toLowerCase()
-    
-    // Default responses if no CMS responses are configured
-    const defaultResponses = [
-      { triggers: ['hello', 'hi', 'hey'], response: "Hello! 👋 Thanks for visiting my portfolio. How can I help you today?" },
-      { triggers: ['about', 'who are you', 'tell me about yourself'], response: "I'm Clarence Sadiaza, an Information Technology student passionate about full-stack development. I love creating clean, intuitive digital experiences with modern technologies like React, Node.js, and cloud platforms." },
-      { triggers: ['projects', 'work', 'portfolio'], response: "I've worked on several projects including an E-Commerce Platform, Task Management App, Weather Dashboard, and this Portfolio Website. You can click on any project card to view the source code on GitHub!" },
-      { triggers: ['skills', 'technologies', 'tech stack'], response: "My tech stack includes React, JavaScript, TypeScript, Node.js, MongoDB, PostgreSQL, AWS, and many more. I'm always learning new technologies to stay current with industry trends." },
-      { triggers: ['contact', 'email', 'reach out'], response: "You can reach me at sadiazaclarence@gmail.com or connect with me on LinkedIn and GitHub. I'm always interested in new opportunities and exciting projects!" },
-      { triggers: ['experience', 'background', 'education'], response: "I'm currently pursuing my Bachelor's in Information Technology at Dr. Yanga's Colleges. I've been self-teaching web development since 2022 and have built various personal projects to practice my skills." }
-    ]
-    
-    // Check CMS auto-responses first
-    if (chatSettings.autoResponses && chatSettings.autoResponses.length > 0) {
-      for (const response of chatSettings.autoResponses) {
-        if (response.trigger && response.trigger.length > 0) {
-          for (const trigger of response.trigger) {
-            if (trigger && message.includes(trigger.toLowerCase())) {
-              return response.response
-            }
-          }
-        }
-      }
-    }
-    
-    // Check default responses
-    for (const response of defaultResponses) {
-      for (const trigger of response.triggers) {
-        if (message.includes(trigger)) {
-          return response.response
-        }
-      }
-    }
-    
-    // Return fallback response
-    return chatSettings.fallbackResponse || "That's interesting! I'm always eager to learn and discuss new topics. Feel free to ask me about my projects, skills, or experiences in tech!"
-  }
-
   if (!isOpen) return null
 
   return (
-    <div className="fixed bottom-24 right-6 z-50 w-80 h-96 bg-white dark:bg-gray-900 border-4 border-black dark:border-gray-300 flex flex-col shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(209,213,219,1)]">
+    <div className="fixed bottom-24 right-6 z-50 w-80 h-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col shadow-lg rounded-none">
       {/* Chat Header */}
-      <div className="flex items-center justify-between p-3 border-b-4 border-black dark:border-gray-300 bg-yellow-400 dark:bg-yellow-400">
+      <div className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 overflow-hidden border-2 border-black dark:border-gray-300">
+          <div className="w-8 h-8 overflow-hidden border border-slate-205 dark:border-slate-800 rounded-none">
             <img 
               src={clarenceImage} 
               alt="Clarence Sadiaza" 
@@ -106,16 +139,16 @@ const Chat = ({ isOpen, onClose }) => {
             />
           </div>
           <div>
-            <h3 className="font-bold text-sm text-black">{chatSettings.buttonText}</h3>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 border border-black"></div>
-              <p className="text-xs text-black font-bold">Online</p>
+            <h3 className="font-semibold text-xs uppercase text-slate-800 dark:text-slate-200 tracking-wider">{chatSettings.buttonText}</h3>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="w-1.5 h-1.5 bg-emerald-500"></div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Online</p>
             </div>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="text-black hover:bg-black hover:text-white dark:hover:bg-gray-300 dark:hover:text-black p-1 border-2 border-black dark:border-gray-300 font-bold transition-all duration-200"
+          className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-850 p-1 border border-slate-200 dark:border-slate-800 rounded-none transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -124,10 +157,10 @@ const Chat = ({ isOpen, onClose }) => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50/50 dark:bg-slate-950/20">
         {messages.length === 0 && (
-          <div className="flex justify-start">
-            <div className="bg-blue-400 px-3 py-2 border-2 border-black dark:border-gray-300 text-sm text-black font-bold">
+          <div className="flex justify-start animate-fade-in">
+            <div className="bg-slate-100 dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-350 font-medium rounded-none">
               Hello! 👋 I'm Clarence's AI assistant. Ask me anything about his projects, skills, or experiences!
             </div>
           </div>
@@ -135,13 +168,13 @@ const Chat = ({ isOpen, onClose }) => {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
           >
             <div
-              className={`max-w-xs px-3 py-2 border-2 border-black dark:border-gray-300 text-sm font-bold ${
+              className={`max-w-[85%] px-3 py-2 border text-xs font-semibold rounded-none ${
                 message.sender === 'user'
-                  ? 'bg-black dark:bg-gray-300 text-white dark:text-black'
-                  : 'bg-yellow-400 dark:bg-yellow-400 text-black'
+                  ? 'bg-slate-900 dark:bg-slate-100 border-slate-900 dark:border-slate-100 text-white dark:text-slate-900'
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-705 text-slate-800 dark:text-slate-200'
               }`}
             >
               {message.message || message.text}
@@ -150,12 +183,12 @@ const Chat = ({ isOpen, onClose }) => {
         ))}
         
         {isTyping && (
-          <div className="flex justify-start">
-            <div className="bg-yellow-400 px-3 py-2 border-2 border-black dark:border-gray-300">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-black border border-black animate-bounce"></div>
-                <div className="w-2 h-2 bg-black border border-black animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-black border border-black animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          <div className="flex justify-start animate-fade-in">
+            <div className="bg-white dark:bg-slate-800 px-3 py-2 border border-slate-200 dark:border-slate-705 rounded-none">
+              <div className="flex space-x-1 py-1">
+                <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-1.5 h-1.5 bg-slate-400 dark:bg-slate-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -164,7 +197,7 @@ const Chat = ({ isOpen, onClose }) => {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t-4 border-black dark:border-gray-300 bg-white dark:bg-gray-900">
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
         <form onSubmit={handleSendMessage} className="space-y-2">
           <div className="flex gap-2">
             <input
@@ -173,21 +206,21 @@ const Chat = ({ isOpen, onClose }) => {
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder={chatSettings.placeholder}
               maxLength={1000}
-              className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border-4 border-black dark:border-gray-300 focus:outline-none focus:bg-yellow-100 dark:focus:bg-yellow-100 text-sm placeholder-gray-500 dark:placeholder-gray-400 text-black dark:text-gray-100 font-bold"
+              className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:border-slate-900 dark:focus:border-slate-100 text-xs placeholder-slate-400 text-slate-800 dark:text-slate-100 font-medium rounded-none"
             />
             <button
               type="submit"
               disabled={!inputMessage.trim()}
-              className="w-10 h-10 bg-black dark:bg-gray-300 text-white dark:text-black border-4 border-black dark:border-gray-300 hover:bg-white hover:text-black dark:hover:bg-gray-400 dark:hover:text-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-bold transition-all duration-200 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:shadow-[2px_2px_0px_0px_rgba(209,213,219,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] dark:hover:shadow-[1px_1px_0px_0px_rgba(209,213,219,1)]"
+              className="w-10 h-10 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border border-slate-900 dark:border-slate-100 hover:bg-slate-805 dark:hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center font-bold transition-colors rounded-none"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>
           </div>
-          <div className="flex justify-between items-center text-xs text-black dark:text-white font-bold">
-            <span>Ask me about programming, web dev, or tech!</span>
-            <span className="bg-yellow-400 px-2 py-1 border-2 border-black dark:border-gray-300">{inputMessage.length}/1000</span>
+          <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+            <span>Ask me about work or skills!</span>
+            <span className="border border-slate-200 dark:border-slate-850 px-2 py-0.5 rounded-none bg-slate-100 dark:bg-slate-900">{inputMessage.length}/1000</span>
           </div>
         </form>
       </div>
