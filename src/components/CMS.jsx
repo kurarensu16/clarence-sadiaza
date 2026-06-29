@@ -8,6 +8,7 @@ const CMS = () => {
   const { content, loading, error, updateContent } = usePortfolioContent()
   const { user, logout, loading: authLoading } = useAuth()
   const [isSaving, setIsSaving] = useState(false)
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [pageViews, setPageViews] = useState([])
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
@@ -1213,11 +1214,11 @@ const CMS = () => {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={handleSave}
-              disabled={isLoading}
-              className="px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border border-slate-900 dark:border-slate-100 hover:bg-slate-805 dark:hover:bg-slate-200 disabled:opacity-50 flex items-center gap-2 rounded-none transition-colors text-sm font-semibold"
+              onClick={() => setShowSaveConfirm(true)}
+              disabled={isSaving}
+              className="px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border border-slate-900 dark:border-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 disabled:opacity-50 flex items-center gap-2 rounded-none transition-colors text-sm font-semibold"
             >
-              {isLoading ? (
+              {isSaving ? (
                 <>
                   <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -1295,6 +1296,37 @@ const CMS = () => {
           </div>
         </div>
       </div>
+      
+      {/* Save Confirmation Modal */}
+      {showSaveConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-none max-w-sm w-full space-y-4 shadow-xl animate-fade-in">
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100 font-mono">Confirm Database Update</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Are you sure you want to save all changes? This will instantly update your live portfolio content.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => setShowSaveConfirm(false)}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-850 font-semibold text-xs rounded-none uppercase tracking-wider transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setShowSaveConfirm(false)
+                  await handleSave()
+                }}
+                className="px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border border-slate-900 dark:border-slate-100 hover:bg-slate-800 dark:hover:bg-slate-200 font-semibold text-xs rounded-none uppercase tracking-wider transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
