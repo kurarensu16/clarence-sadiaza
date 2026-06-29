@@ -8,7 +8,9 @@ const CMS = () => {
   const { content, loading, error, updateContent } = usePortfolioContent()
   const { user, logout, loading: authLoading } = useAuth()
   const [isSaving, setIsSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('hero')
+  const [activeTab, setActiveTab] = useState('dashboard')
+  const [pageViews, setPageViews] = useState([])
+  const [analyticsLoading, setAnalyticsLoading] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -33,6 +35,28 @@ const CMS = () => {
       checkApiKey()
     }
   }, [user])
+
+  useEffect(() => {
+    const fetchPageViews = async () => {
+      try {
+        setAnalyticsLoading(true)
+        const { data, error } = await supabase
+          .from('page_views')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (error) throw error
+        setPageViews(data || [])
+      } catch (err) {
+        console.warn('Failed to load page views data:', err)
+      } finally {
+        setAnalyticsLoading(false)
+      }
+    }
+    if (user && activeTab === 'dashboard') {
+      fetchPageViews()
+    }
+  }, [user, activeTab])
 
   const handleImageUpload = async (file, projectIndex) => {
     if (!file) return
@@ -174,6 +198,15 @@ const CMS = () => {
 
   const tabs = [
     {
+      id: 'dashboard',
+      name: 'Dashboard',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      )
+    },
+    {
       id: 'hero',
       name: 'Hero Section',
       icon: (
@@ -272,6 +305,153 @@ const CMS = () => {
     }
 
     switch (activeTab) {
+      case 'dashboard':
+        return (
+          <div className="space-y-8">
+            <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
+              <h3 className="text-xl font-bold tracking-tight mb-1 uppercase">Analytics Overview</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">Real-time visitor logs and geographic breakdown</p>
+            </div>
+
+            {analyticsLoading ? (
+              <div className="flex items-center justify-center h-48 border border-slate-200 dark:border-slate-800 border-dashed">
+                <div className="text-center font-mono">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white mx-auto mb-2"></div>
+                  <p className="text-xs text-slate-500">Retrieving visitor logs...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Stats Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="border border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between">
+                    <span className="text-xs font-mono uppercase text-slate-400">Total Page Views</span>
+                    <span className="text-4xl font-extrabold tracking-tight mt-2 font-mono text-black dark:text-white">{pageViews.length}</span>
+                  </div>
+                  <div className="border border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between">
+                    <span className="text-xs font-mono uppercase text-slate-400">Visits (Last 24h)</span>
+                    <span className="text-4xl font-extrabold tracking-tight mt-2 font-mono text-black dark:text-white">
+                      {pageViews.filter(v => new Date() - new Date(v.created_at) < 24 * 60 * 60 * 1000).length}
+                    </span>
+                  </div>
+                  <div className="border border-slate-200 dark:border-slate-800 p-6 flex flex-col justify-between">
+                    <span className="text-xs font-mono uppercase text-slate-400">Unique Regions</span>
+                    <span className="text-4xl font-extrabold tracking-tight mt-2 font-mono text-black dark:text-white">
+                      {new Set(pageViews.map(v => [v.city, v.region].filter(Boolean).join(', ')).filter(Boolean)).size}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Column: Stats Lists */}
+                  <div className="space-y-6">
+                    {/* Pages Popularity */}
+                    <div className="border border-slate-200 dark:border-slate-800 p-6">
+                      <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-4">Popular Pages</h4>
+                      <div className="space-y-3">
+                        {(() => {
+                          const pagePathCounts = pageViews.reduce((acc, curr) => {
+                            acc[curr.page_path] = (acc[curr.page_path] || 0) + 1
+                            return acc
+                          }, {})
+                          const sortedPages = Object.entries(pagePathCounts)
+                            .map(([path, count]) => ({ path, count }))
+                            .sort((a, b) => b.count - a.count)
+
+                          if (sortedPages.length === 0) {
+                            return <p className="text-xs font-mono text-slate-500">No visits tracked yet.</p>
+                          }
+
+                          return sortedPages.map(({ path, count }) => {
+                            const pct = pageViews.length > 0 ? Math.round((count / pageViews.length) * 100) : 0
+                            return (
+                              <div key={path} className="space-y-1">
+                                <div className="flex justify-between text-xs font-mono">
+                                  <span className="font-semibold text-slate-800 dark:text-slate-200">{path}</span>
+                                  <span className="text-slate-500">{count} views ({pct}%)</span>
+                                </div>
+                                <div className="h-1 bg-slate-100 dark:bg-slate-900 rounded-none overflow-hidden">
+                                  <div 
+                                    className="h-full bg-black dark:bg-white" 
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Geolocation breakdown */}
+                    <div className="border border-slate-200 dark:border-slate-800 p-6">
+                      <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-4">Visits by Location</h4>
+                      <div className="max-h-60 overflow-y-auto space-y-2 pr-2 font-mono text-xs">
+                        {(() => {
+                          const cityCounts = pageViews.reduce((acc, curr) => {
+                            const loc = [curr.city, curr.region].filter(Boolean).join(', ')
+                            const key = loc || 'Unknown Location'
+                            acc[key] = (acc[key] || 0) + 1
+                            return acc
+                          }, {})
+                          const sortedLocs = Object.entries(cityCounts)
+                            .map(([location, count]) => ({ location, count }))
+                            .sort((a, b) => b.count - a.count)
+
+                          if (sortedLocs.length === 0) {
+                            return <p className="text-slate-500">No geographic data logged.</p>
+                          }
+
+                          return sortedLocs.slice(0, 10).map(({ location, count }) => (
+                            <div key={location} className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-900 last:border-0">
+                              <span className="text-slate-800 dark:text-slate-200">{location}</span>
+                              <span className="font-semibold text-slate-950 dark:text-slate-50">{count} visits</span>
+                            </div>
+                          ))
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Live Visitor Feed */}
+                  <div className="border border-slate-200 dark:border-slate-800 p-6 flex flex-col">
+                    <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-4">Recent Visits Feed</h4>
+                    <div className="flex-1 overflow-y-auto max-h-[480px] space-y-4 pr-2 font-mono text-xs">
+                      {pageViews.slice(0, 15).map((view) => {
+                        const loc = [view.city, view.region].filter(Boolean).join(', ')
+                        const time = new Date(view.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        const date = new Date(view.created_at).toLocaleDateString([], { month: 'short', day: '2-digit' })
+                        return (
+                          <div key={view.id} className="flex items-start justify-between py-2 border-b border-slate-100 dark:border-slate-900 last:border-0">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-900 font-semibold uppercase text-[10px] tracking-tight text-slate-800 dark:text-slate-200">
+                                  {view.page_path}
+                                </span>
+                                <span className="text-slate-400 text-[10px]">{date} at {time}</span>
+                              </div>
+                              <div className="text-slate-600 dark:text-slate-400">
+                                {loc || 'Unknown Location'}
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-tight flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+                              Viewed
+                            </span>
+                          </div>
+                        )
+                      })}
+                      {pageViews.length === 0 && (
+                        <p className="text-slate-500 text-center py-12">No recent visits logged.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )
+
       case 'hero':
         return (
           <div className="space-y-6">

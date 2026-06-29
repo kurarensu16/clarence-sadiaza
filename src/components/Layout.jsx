@@ -4,6 +4,8 @@ import Sidebar from './Sidebar'
 import Chat from './Chat'
 import { usePortfolioContent } from '../hooks/usePortfolioContent'
 
+import { supabase } from '../lib/supabase'
+
 const Layout = () => {
 	const location = useLocation()
 	const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
@@ -32,6 +34,61 @@ const Layout = () => {
 		}
 		localStorage.setItem('theme', theme)
 	}, [theme])
+
+	useEffect(() => {
+		// Do not track visits on administrative or authentication screens
+		if (
+			location.pathname.startsWith('/cms') || 
+			location.pathname.startsWith('/login')
+		) {
+			return
+		}
+
+		const recordPageView = async () => {
+			try {
+				let geo = { city: null, region: null, country: null }
+				
+				// Read cached geographical location from sessionStorage if available
+				const cachedGeo = sessionStorage.getItem('portfolio_visitor_geo_v2')
+				if (cachedGeo) {
+					geo = JSON.parse(cachedGeo)
+				} else {
+					try {
+						// Retrieve general location silently without popups via public IP API
+						const res = await fetch(`https://ipwho.is/?nocache=${Date.now()}`)
+						if (res.ok) {
+							const ipData = await res.json()
+							if (ipData && ipData.success) {
+								geo = {
+									city: ipData.city || null,
+									region: ipData.region || null, // Province / State
+									country: ipData.country || null
+								}
+								// Cache to sessionStorage to avoid spamming the free api limit
+								sessionStorage.setItem('portfolio_visitor_geo_v2', JSON.stringify(geo))
+							}
+						}
+					} catch (geoError) {
+						console.warn('Geolocation API lookup failed, logging visit without geo:', geoError)
+					}
+				}
+
+				// Log page visit
+				await supabase
+					.from('page_views')
+					.insert({
+						page_path: location.pathname,
+						city: geo.city,
+						region: geo.region,
+						country: geo.country
+					})
+			} catch (err) {
+				console.warn('Failed to record page view:', err)
+			}
+		}
+
+		recordPageView()
+	}, [location.pathname])
 
 	const getPageTitle = () => {
 		const path = location.pathname
