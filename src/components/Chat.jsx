@@ -2,14 +2,26 @@ import { useState, useEffect, useRef } from 'react'
 import clarenceImage from '../assets/clarence.jpg'
 import { useChatMessages } from '../hooks/useChatMessages'
 import { usePortfolioContent } from '../hooks/usePortfolioContent'
-import { supabase } from '../lib/supabase'
 
 const defaultChatSettings = {
   enabled: true,
   buttonText: "Chat with Clarence",
   placeholder: "Type a message...",
   autoResponses: [],
-  fallbackResponse: "That's interesting! I'm always eager to learn and discuss new topics."
+  fallbackResponse: "I'm having trouble connecting right now. Please try again or email Clarence directly!"
+}
+
+// ─── Client-side rate limiter (per browser session) ───────────────────────────
+// ─── Client-side flood protection (generous 30 msgs/min) ──────────────────────
+const CLIENT_RATE = { maxRequests: 30, windowMs: 60_000 }
+let clientMsgTimestamps = []
+
+function isClientRateLimited() {
+  const now = Date.now()
+  clientMsgTimestamps = clientMsgTimestamps.filter(t => now - t < CLIENT_RATE.windowMs)
+  if (clientMsgTimestamps.length >= CLIENT_RATE.maxRequests) return true
+  clientMsgTimestamps.push(now)
+  return false
 }
 
 const Chat = ({ isOpen, onClose }) => {
@@ -29,93 +41,111 @@ const Chat = ({ isOpen, onClose }) => {
       const isDev = import.meta.env.DEV
       const devApiKey = import.meta.env.VITE_OPENROUTER_API_KEY
 
+      // Build recent conversation turns so follow-up questions work
+      const recentHistory = messages.slice(-4).map(m => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.message || m.text || ''
+      })).filter(m => m.content.trim())
+
       if (isDev && devApiKey) {
-        // Direct query in local development to avoid proxy configurations in dev mode
+        // Direct query in local dev – production routes through /api/chat proxy
         const name = content?.hero?.name || 'Clarence Timothy Sadiaza'
         const title = content?.hero?.title || 'Software Engineer'
         const about = (content?.about?.paragraphs || []).join(' ')
-        const skills = JSON.stringify(content?.skills || {})
-        const experience = JSON.stringify(content?.experience || [])
-        const projects = JSON.stringify(content?.projects || [])
-        const certifications = JSON.stringify(content?.certifications || [])
         const email = content?.hero?.email || 'sadiazaclarence@gmail.com'
+        
+        // Format structured content cleanly to avoid prompt bloat
+        const projectSummaries = (content?.projects || []).map(p => `- ${p.title}: ${p.description || ''} (Stack: ${(p.tags || []).join(', ')})`).join('\n')
+        const skillCategories = Object.entries(content?.skills || {}).map(([cat, list]) => `${cat}: ${(Array.isArray(list) ? list : []).map(s => typeof s === 'string' ? s : s.name).join(', ')}`).join('\n')
+        const experienceSummaries = (content?.experience || []).map(e => `- ${e.role} at ${e.company} (${e.period || ''})`).join('\n')
 
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
           headers: {
-            "Authorization": `Bearer ${devApiKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": window.location.origin,
-            "X-Title": "Clarence Sadiaza Portfolio (Local Dev)"
+            'Authorization': `Bearer ${devApiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Clarence Sadiaza Portfolio (Local Dev)'
           },
+          signal: AbortSignal.timeout(12000),
           body: JSON.stringify({
-            model: "poolside/laguna-m.1:free",
+            models: [
+              'inclusionai/ling-3.0-flash-sante:free',
+              'liquid/lfm-2.5-2.6b:free',
+              'poolside/laguna-s-2.1:free'
+            ],
+            max_tokens: 600,
+            include_reasoning: false,
             messages: [
               {
-                role: "system",
-                content: `You are the AI Assistant chatbot on Clarence Timothy Sadiaza's portfolio website. 
-Answer questions briefly and professionally on behalf of Clarence. Keep responses under 3 sentences. If you don't know something or if it's not in the resume, say you will check and let him know, or tell them to email him at ${email}.
+                role: 'system',
+                content: `You are the AI assistant on ${name}'s portfolio website. Answer questions professionally and accurately about ${name}'s background, skills, and projects based on his resume below. Keep answers concise (under 4 sentences or bullet points). If a question is unrelated to Clarence, politely decline and redirect them to his work. If you do not know something, suggest emailing ${email}.
+
 Resume Details:
-- Name: ${name}
-- Title: ${title}
+- Name: ${name} (${title})
 - About: ${about}
-- Technologies / Skills: ${skills}
-- Experience: ${experience}
-- Projects: ${projects}
-- Certifications: ${certifications}
+- Skills:\n${skillCategories}
+- Projects:\n${projectSummaries}
+- Experience:\n${experienceSummaries}
 - Contact Email: ${email}`
               },
-              { role: "user", content: userMessage }
+              ...recentHistory,
+              { role: 'user', content: userMessage }
             ]
           })
         })
 
         if (response.ok) {
           const data = await response.json()
-          return data.choices?.[0]?.message?.content || chatSettings.fallbackResponse
+          const msg = data.choices?.[0]?.message
+          const answer = (msg?.content || msg?.reasoning || '').trim()
+          if (answer) return answer
         }
       }
 
-      // Default: Call the secure serverless API proxy (Vercel)
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ user_message: userMessage })
+      // Production: secure serverless proxy (API key never exposed to client)
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          user_message: userMessage,
+          history: recentHistory 
+        })
       })
 
       if (response.ok) {
         const data = await response.json()
-        if (data.response && data.response.trim()) {
-          return data.response
-        }
+        if (data.response?.trim()) return data.response
+      } else if (response.status === 429) {
+        return "You're sending messages too fast. Please wait a moment and try again! ⏳"
       }
-    } catch (error) {
-      console.warn('AI chat completion failed:', error)
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn('AI chat error:', err)
+      }
     }
-    
-    return chatSettings.fallbackResponse || "I'm sorry, I'm currently having trouble connecting to my AI backend. Please try again in a few moments, or feel free to email Clarence directly!"
+
+    return chatSettings.fallbackResponse
   }
 
   const handleSendMessage = async (e) => {
     e.preventDefault()
-    if (!inputMessage.trim()) return
+    const trimmed = inputMessage.trim()
+    if (!trimmed) return
+
+    // Client-side rate limit check
+    if (isClientRateLimited()) {
+      return
+    }
 
     try {
-      // Send user message
-      await sendMessage(inputMessage, 'user')
+      await sendMessage(trimmed, 'user')
       setInputMessage('')
       setIsTyping(true)
-
-      // Generate bot response via OpenRouter
-      const botResponse = await generateAIResponse(inputMessage)
-      
-      // Send bot response
+      const botResponse = await generateAIResponse(trimmed)
       await sendMessage(botResponse, 'bot')
       setIsTyping(false)
-    } catch (error) {
-      console.error('Error sending message:', error)
+    } catch {
       setIsTyping(false)
     }
   }
@@ -205,7 +235,7 @@ Resume Details:
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder={chatSettings.placeholder}
-              maxLength={1000}
+              maxLength={500}
               className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:border-slate-900 dark:focus:border-slate-100 text-xs placeholder-slate-400 text-slate-800 dark:text-slate-100 font-medium rounded-none"
             />
             <button
@@ -219,8 +249,12 @@ Resume Details:
             </button>
           </div>
           <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
-            <span>Ask me about work or skills!</span>
-            <span className="border border-slate-200 dark:border-slate-850 px-2 py-0.5 rounded-none bg-slate-100 dark:bg-slate-900">{inputMessage.length}/1000</span>
+            <span>Ask about his work or skills!</span>
+            <span className={`border px-2 py-0.5 rounded-none ${
+              inputMessage.length > 450
+                ? 'border-amber-400 bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
+                : 'border-slate-200 dark:border-slate-850 bg-slate-100 dark:bg-slate-900'
+            }`}>{inputMessage.length}/500</span>
           </div>
         </form>
       </div>

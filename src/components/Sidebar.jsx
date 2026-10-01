@@ -59,7 +59,7 @@ const Sidebar = ({ theme, setTheme, isOpen, onClose }) => {
         {onClose && (
           <button 
             onClick={onClose}
-            className="md:hidden self-end mb-4 p-2 border-2 border-black dark:border-gray-300 bg-white dark:bg-gray-900 font-bold hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:shadow-[2px_2px_0px_0px_rgba(209,213,219,1)]"
+            className="md:hidden self-end mb-4 p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm"
             aria-label="Close menu"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

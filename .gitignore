@@ -25,7 +25,8 @@ dist-ssr
 
 .env
 
-# Ignore all .md files except README.md
+# Ignore all .md files except documentation
 *.md
 !README.md
 !VERCEL_ENV_SETUP.md
+!SERVICES.md

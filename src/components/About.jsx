@@ -55,20 +55,20 @@ const About = () => {
       <section id="about" className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-8 rounded-none shadow-sm hover:shadow-md transition-shadow">
         {/* Header Accent Bar */}
         <div className="flex items-center gap-3.5 mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
-          <div className="p-2 bg-slate-105 dark:bg-slate-850 text-slate-700 dark:text-slate-300 rounded-none">
+          <div className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-none">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight uppercase">Biography</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500">A short introduction about me and my goals</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Background, focus areas, and engineering interests</p>
           </div>
         </div>
         
         <div className="space-y-4 text-slate-600 dark:text-slate-300 text-sm md:text-base leading-relaxed pl-1">
           {aboutContent.paragraphs?.map((paragraph, index) => (
-            <p key={index} className="pl-4 border-l border-slate-350 dark:border-slate-700 text-slate-600 dark:text-slate-400">{paragraph}</p>
+            <p key={index} className="pl-4 border-l-2 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">{paragraph}</p>
           ))}
         </div>
       </section>

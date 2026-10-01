@@ -47,8 +47,10 @@ VALUES (
       }
     ],
     "skills": {
-      "frontend": ["JavaScript", "TypeScript", "React", "Tailwind CSS", "HTML5", "CSS3", "Sass", "Webpack", "Vite"],
-      "backend": ["Node.js", "Express", "Python", "MySQL", "MongoDB", "PostgreSQL", "AWS", "Supabase"]
+      "frontend": ["React", "JavaScript", "Tailwind CSS", "Vite", "Redux", "Material UI", "Framer Motion", "Leaflet", "CSS3"],
+      "backend": ["Node.js", "MongoDB", "Firebase", "REST API", "PayMongo"],
+      "tools": ["Git", "GitHub", "Postman", "Vercel", "Teams"],
+      "ai": ["PyTorch", "OpenAI", "Claude Code", "Google Antigravity", "OpenRouter", "OpenCode", "KiloCode"]
     },
     "projects": [
       {

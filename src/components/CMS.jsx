@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { usePortfolioContent } from '../hooks/usePortfolioContent'
 import { supabase } from '../lib/supabase'
+import { renderTechIcon, AVAILABLE_ICONS } from '../lib/techIcons'
 
 const CMS = () => {
   const { content, loading, error, updateContent } = usePortfolioContent()
@@ -195,7 +196,59 @@ const CMS = () => {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      await updateContent(currentContent)
+      // Ensure all unique project tags are present in skills before saving
+      const projectTags = Array.from(
+        new Set((currentContent.projects || []).flatMap(p => p.tags || []))
+      ).map(t => typeof t === 'string' ? t.trim() : '').filter(Boolean)
+
+      let contentToSave = { ...currentContent }
+
+      if (projectTags.length > 0) {
+        const backendKeywords = [
+          'node', 'express', 'python', 'fastapi', 'flask', 'django', 'sql', 'mysql', 
+          'postgres', 'sqlite', 'mongo', 'firebase', 'supabase', 'aws', 'api', 'rest', 
+          'graphql', 'prisma', 'paymongo', 'stripe', 'server', 'docker', 'redis', 
+          'pytorch', 'ai', 'openai', 'anthropic', 'openrouter'
+        ]
+
+        const skillsObj = contentToSave.skills || {}
+        const existingSkillNames = Object.values(skillsObj).flat().map(s => {
+          const n = typeof s === 'object' ? s?.name : s
+          return typeof n === 'string' ? n.trim().toLowerCase() : ''
+        }).filter(Boolean)
+
+        const newFrontend = [...(skillsObj.frontend || [])]
+        const newBackend = [...(skillsObj.backend || [])]
+        let hasNew = false
+
+        projectTags.forEach(tag => {
+          const lower = tag.toLowerCase()
+          if (!existingSkillNames.includes(lower)) {
+            const isBackend = backendKeywords.some(kw => lower.includes(kw))
+            const item = { name: tag, icon: 'auto' }
+            if (isBackend) {
+              newBackend.push(item)
+            } else {
+              newFrontend.push(item)
+            }
+            hasNew = true
+          }
+        })
+
+        if (hasNew) {
+          contentToSave = {
+            ...contentToSave,
+            skills: {
+              ...skillsObj,
+              frontend: newFrontend,
+              backend: newBackend
+            }
+          }
+          setCurrentContent(contentToSave)
+        }
+      }
+
+      await updateContent(contentToSave)
 
       // Save key securely via database RPC if it was updated
       if (openRouterKeyInput !== '••••••••••••') {
@@ -733,26 +786,146 @@ const CMS = () => {
           </div>
         )
 
-      case 'skills':
+      case 'skills': {
         const skillsObj = currentContent.skills || {}
+        
+        // Map all unique tags used across projects to their parent projects
+        const projectTagsMap = (currentContent.projects || []).reduce((acc, proj) => {
+          ;(proj.tags || []).forEach(tag => {
+            const trimmed = typeof tag === 'string' ? tag.trim() : ''
+            if (!trimmed) return
+            const lower = trimmed.toLowerCase()
+            if (!acc[lower]) {
+              acc[lower] = { name: trimmed, projects: [] }
+            }
+            if (proj.title && !acc[lower].projects.includes(proj.title)) {
+              acc[lower].projects.push(proj.title)
+            }
+          })
+          return acc
+        }, {})
+
+        const allProjectTags = Object.values(projectTagsMap).map(i => i.name)
+        const categoriesList = Object.keys(skillsObj)
+
+        const backendKeywords = [
+          'node', 'express', 'python', 'fastapi', 'flask', 'django', 'sql', 'mysql', 
+          'postgres', 'sqlite', 'mongo', 'firebase', 'supabase', 'aws', 'api', 'rest', 
+          'graphql', 'prisma', 'paymongo', 'stripe', 'server', 'docker', 'redis'
+        ]
+
+        // Sync: add project tags not already in skills, while PRESERVING all categories (tools, ai, etc.)
+        const handleSyncFromProjects = () => {
+          if (allProjectTags.length === 0) {
+            alert('No project tags found. Add tags to your projects first!')
+            return
+          }
+
+          const existingNames = new Set(
+            Object.values(skillsObj).flat().map(s => {
+              const name = typeof s === 'object' ? s?.name : s
+              return typeof name === 'string' ? name.trim().toLowerCase() : ''
+            }).filter(Boolean)
+          )
+
+          const newFrontend = [...(skillsObj.frontend || [])]
+          const newBackend = [...(skillsObj.backend || [])]
+
+          allProjectTags.forEach(tagName => {
+            const lower = tagName.toLowerCase()
+            if (!existingNames.has(lower)) {
+              existingNames.add(lower)
+              const isBackend = backendKeywords.some(kw => lower.includes(kw))
+              const itemToStore = { name: tagName, icon: 'auto' }
+              if (isBackend) {
+                newBackend.push(itemToStore)
+              } else {
+                newFrontend.push(itemToStore)
+              }
+            }
+          })
+
+          setCurrentContent(prev => ({
+            ...prev,
+            skills: {
+              ...skillsObj,
+              frontend: newFrontend,
+              backend: newBackend
+            }
+          }))
+        }
+
+        // Restore all standard categories (Tools & AI) if missing
+        const handleRestoreAllCategories = () => {
+          setCurrentContent(prev => ({
+            ...prev,
+            skills: {
+              frontend: prev.skills?.frontend?.length ? prev.skills.frontend : ['React', 'JavaScript', 'Tailwind CSS', 'Vite', 'Redux', 'Material UI', 'Framer Motion', 'Leaflet', 'CSS3'],
+              backend: prev.skills?.backend?.length ? prev.skills.backend : ['Node.js', 'MongoDB', 'Firebase', 'REST API', 'PayMongo'],
+              tools: prev.skills?.tools?.length ? prev.skills.tools : ['Git', 'GitHub', 'Postman', 'Vercel', 'Teams'],
+              ai: prev.skills?.ai?.length ? prev.skills.ai : ['PyTorch', 'OpenAI', 'Claude Code', 'Google Antigravity', 'OpenRouter', 'OpenCode', 'KiloCode']
+            }
+          }))
+        }
+
         return (
           <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">Skills & Technologies</h3>
-              <p className="text-xs text-slate-500 mt-1">Manage categories and technical tools displayed on your portfolio</p>
+            {/* Header with Project Sync Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold uppercase tracking-tight text-slate-900 dark:text-slate-100">Tech Stack & Categories</h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold">
+                    {Object.keys(skillsObj).length} Categories
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Manage technical categories and tools displayed on your portfolio.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {(!skillsObj.tools || !skillsObj.ai) && (
+                  <button
+                    onClick={handleRestoreAllCategories}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold rounded-none transition-colors"
+                    title="Restore Tools & AI categories"
+                  >
+                    <span>Restore Tools & AI</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleSyncFromProjects}
+                  className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 text-xs font-semibold rounded-none transition-colors shadow-sm"
+                  title="Import any missing tags from your projects into tech stack"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Sync from Projects</span>
+                </button>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {Object.entries(skillsObj).map(([category, items]) => {
                 const displayTitle = 
                   category === 'frontend' ? 'Frontend Technologies' :
-                  category === 'backend' ? 'Backend & Services' :
+                  category === 'backend' ? 'Backend & Database' :
+                  category === 'tools' ? 'Tools & Workflow' :
+                  category === 'ai' ? 'AI & Machine Learning' :
                   category.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
                 
                 return (
                   <div key={category} className="border border-slate-200 dark:border-slate-800 rounded-none p-5 bg-slate-50/20 dark:bg-slate-900/10 space-y-4">
                     <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-800">
-                      <h4 className="font-bold text-sm tracking-tight uppercase text-slate-700 dark:text-slate-300">{displayTitle}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-sm tracking-tight uppercase text-slate-700 dark:text-slate-300">{displayTitle}</h4>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-none">
+                          {items?.length || 0}
+                        </span>
+                      </div>
                       {category !== 'frontend' && category !== 'backend' && (
                         <button
                           onClick={() => {
@@ -770,42 +943,130 @@ const CMS = () => {
                       )}
                     </div>
                     
-                    <div className="space-y-2">
-                      {(items || []).map((skill, index) => (
-                        <div key={index} className="flex gap-2">
-                          <input
-                            type="text"
-                            value={skill}
-                            onChange={(e) => {
-                              const newCategorySkills = [...(items || [])]
-                              newCategorySkills[index] = e.target.value
-                              setCurrentContent(prev => ({
-                                ...prev,
-                                skills: {
-                                  ...prev.skills,
-                                  [category]: newCategorySkills
-                                }
-                              }))
-                            }}
-                            className="flex-1 px-3 py-2 border border-slate-205 dark:border-slate-800 rounded-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500/10 focus:border-slate-900 dark:focus:border-slate-100 text-sm transition-all"
-                          />
-                          <button
-                            onClick={() => {
-                              const newCategorySkills = (items || []).filter((_, i) => i !== index)
-                              setCurrentContent(prev => ({
-                                ...prev,
-                                skills: {
-                                  ...prev.skills,
-                                  [category]: newCategorySkills
-                                }
-                              }))
-                            }}
-                            className="px-3 py-2 text-red-500 hover:text-red-700 font-semibold text-xs uppercase tracking-wider transition-colors"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
+                    <div className="space-y-3">
+                      {(items || []).map((skill, index) => {
+                        const skillName = typeof skill === 'object' ? (skill.name || '') : skill
+                        const explicitIcon = typeof skill === 'object' ? (skill.icon || 'auto') : 'auto'
+                        const projectUsage = projectTagsMap[skillName.trim().toLowerCase()]
+
+                        return (
+                          <div key={index} className="flex flex-col gap-2 p-2.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-none shadow-sm">
+                            <div className="flex items-center gap-2">
+                              {/* Live Icon Preview - Clean without square border */}
+                              <div className="w-7 h-7 flex-shrink-0 flex items-center justify-center" title="Icon Preview">
+                                {renderTechIcon(skillName, explicitIcon)}
+                              </div>
+
+                              {/* Skill Name Input */}
+                              <input
+                                type="text"
+                                value={skillName}
+                                placeholder="e.g. React, Docker, Python"
+                                onChange={(e) => {
+                                  const newCategorySkills = [...(items || [])]
+                                  const updatedVal = e.target.value
+                                  if (typeof skill === 'object') {
+                                    newCategorySkills[index] = { ...skill, name: updatedVal }
+                                  } else {
+                                    newCategorySkills[index] = updatedVal
+                                  }
+                                  setCurrentContent(prev => ({
+                                    ...prev,
+                                    skills: {
+                                      ...prev.skills,
+                                      [category]: newCategorySkills
+                                    }
+                                  }))
+                                }}
+                                className="flex-1 px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 rounded-none bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-900 dark:focus:ring-slate-100 text-xs font-medium transition-all"
+                              />
+
+                              {/* Category Switcher Dropdown */}
+                              <select
+                                value={category}
+                                onChange={(e) => {
+                                  const targetCat = e.target.value
+                                  if (targetCat === category) return
+                                  const itemToMove = items[index]
+                                  const updatedSource = items.filter((_, i) => i !== index)
+                                  const updatedTarget = [...(skillsObj[targetCat] || []), itemToMove]
+                                  setCurrentContent(prev => ({
+                                    ...prev,
+                                    skills: {
+                                      ...prev.skills,
+                                      [category]: updatedSource,
+                                      [targetCat]: updatedTarget
+                                    }
+                                  }))
+                                }}
+                                className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-none bg-slate-50/50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 text-xs font-medium focus:outline-none max-w-[110px]"
+                                title="Change Category"
+                              >
+                                {categoriesList.map(cat => (
+                                  <option key={cat} value={cat}>
+                                    {cat === 'frontend' ? 'Frontend' : cat === 'backend' ? 'Backend' : cat}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* Explicit Icon Picker Dropdown */}
+                              <select
+                                value={explicitIcon}
+                                onChange={(e) => {
+                                  const newCategorySkills = [...(items || [])]
+                                  const selected = e.target.value
+                                  newCategorySkills[index] = {
+                                    name: skillName,
+                                    icon: selected
+                                  }
+                                  setCurrentContent(prev => ({
+                                    ...prev,
+                                    skills: {
+                                      ...prev.skills,
+                                      [category]: newCategorySkills
+                                    }
+                                  }))
+                                }}
+                                className="px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-none bg-slate-50/50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 text-xs font-medium focus:outline-none max-w-[120px]"
+                                title="Override or choose specific icon"
+                              >
+                                {AVAILABLE_ICONS.map(opt => (
+                                  <option key={opt.id} value={opt.id}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* Remove Skill Button */}
+                              <button
+                                onClick={() => {
+                                  const newCategorySkills = (items || []).filter((_, i) => i !== index)
+                                  setCurrentContent(prev => ({
+                                    ...prev,
+                                    skills: {
+                                      ...prev.skills,
+                                      [category]: newCategorySkills
+                                    }
+                                  }))
+                                }}
+                                className="px-2 py-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 font-semibold text-xs transition-colors rounded-none"
+                                title="Delete skill"
+                              >
+                                ✕
+                              </button>
+                            </div>
+
+                            {/* Project Attribution Indicator */}
+                            {projectUsage && (
+                              <div className="flex items-center justify-between text-[11px] font-mono px-1">
+                                <span className="text-emerald-700 dark:text-emerald-400 truncate">
+                                  ✓ Used in {projectUsage.projects.length} {projectUsage.projects.length === 1 ? 'project' : 'projects'} ({projectUsage.projects.join(', ')})
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                       
                       <button
                         onClick={() => {
@@ -817,7 +1078,7 @@ const CMS = () => {
                             }
                           }))
                         }}
-                        className="px-4 py-2 bg-slate-100 dark:bg-slate-850 hover:bg-slate-205 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-none flex items-center gap-2 text-xs font-semibold uppercase tracking-wider transition-colors"
+                        className="px-4 py-2 bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-none flex items-center gap-2 text-xs font-semibold uppercase tracking-wider transition-colors"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -887,6 +1148,7 @@ const CMS = () => {
             </div>
           </div>
         )
+      }
 
       case 'projects':
         return (
@@ -901,6 +1163,8 @@ const CMS = () => {
                   tags: [],
                   year: '',
                   url: '',
+                  liveUrl: '',
+                  githubUrl: '',
                   image: ''
                 })}
                 className="px-4 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border border-slate-900 dark:border-slate-100 hover:bg-slate-805 dark:hover:bg-slate-200 flex items-center gap-2 rounded-none text-sm font-semibold transition-colors"
@@ -955,23 +1219,52 @@ const CMS = () => {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-2">Tags (comma-separated)</label>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                        <label className="block text-sm font-medium">Tags (comma-separated)</label>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+                          💡 Tags entered here automatically populate your Tech Stack
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={project.tags.join(', ')}
                         onChange={(e) => updateArrayContent('projects', index, 'tags', e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag))}
-                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500/10 focus:border-slate-900 dark:focus:border-slate-100 transition-all"
+                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500/10 focus:border-slate-900 dark:focus:border-slate-100 transition-all text-sm font-mono"
                         placeholder="React, Node.js, MongoDB"
                       />
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium mb-2">Project URL</label>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Live Demo URL</label>
                       <input
                         type="url"
-                        value={project.url || ''}
-                        onChange={(e) => updateArrayContent('projects', index, 'url', e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500/10 focus:border-slate-900 dark:focus:border-slate-100 transition-all"
-                        placeholder="https://github.com/username/project-name"
+                        value={project.liveUrl || (project.url && !project.url.includes('github.com') ? project.url : '')}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          updateArrayContent('projects', index, 'liveUrl', val)
+                          // also sync to url for backwards compatibility if not github
+                          if (!project.githubUrl) {
+                            updateArrayContent('projects', index, 'url', val)
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500/10 focus:border-slate-900 dark:focus:border-slate-100 transition-all text-sm"
+                        placeholder="https://my-app.vercel.app"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">GitHub / Source URL</label>
+                      <input
+                        type="url"
+                        value={project.githubUrl || (project.url && project.url.includes('github.com') ? project.url : '')}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          updateArrayContent('projects', index, 'githubUrl', val)
+                          // sync to fallback url if url was empty
+                          if (!project.url) {
+                            updateArrayContent('projects', index, 'url', val)
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-none bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500/10 focus:border-slate-900 dark:focus:border-slate-100 transition-all text-sm"
+                        placeholder="https://github.com/kurarensu16/my-repo"
                       />
                     </div>
                     <div className="md:col-span-2">
